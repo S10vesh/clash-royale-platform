@@ -9,7 +9,7 @@ import Help from './pages/Help';
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/clash-royale-platform">
       <div className="h-screen w-screen overflow-hidden">
         <Routes>
           <Route path="/" element={<Home />} />
