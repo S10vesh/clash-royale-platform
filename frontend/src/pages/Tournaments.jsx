@@ -1,19 +1,12 @@
 import { useState } from 'react';
 import Navigation from '../components/Navigation';
 
-function Clans() {
-  const [search, setSearch] = useState('');
-  const [selectedTag, setSelectedTag] = useState('all');
+function Tournaments() {
+  const [selectedStatus, setSelectedStatus] = useState('future');
+  const [selectedMode, setSelectedMode] = useState('all');
 
-  // Пока нет кланов — пустой массив
-  const clans = [];
-
-  const filteredClans = clans.filter(clan => {
-    const matchesSearch = clan.name?.toLowerCase().includes(search.toLowerCase()) ||
-                         clan.tag?.toLowerCase().includes(search.toLowerCase());
-    const matchesTag = selectedTag === 'all' || clan.rank === selectedTag;
-    return matchesSearch && matchesTag;
-  });
+  // Моковые данные для турниров (потом заменится на реальные)
+  const tournaments = [];
 
   return (
     <div className="min-h-screen text-[#e0e0e0] flex flex-col">
@@ -21,50 +14,74 @@ function Clans() {
       
       <div className="flex-1 container-cs py-8">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-3xl font-bold uppercase tracking-wider">Кланы</h1>
+          <h1 className="text-3xl font-bold uppercase tracking-wider">Турниры</h1>
           <button className="bg-[#2a2a2a] hover:bg-[#3a3a3a] border border-[#444] px-5 py-2 text-sm uppercase tracking-wider transition hover:scale-105">
-            + Создать клан
+            + Создать турнир
           </button>
         </div>
 
-        {/* Поиск и фильтры — оставляем, пригодятся */}
+        {/* Фильтры */}
         <div className="flex gap-4 mb-6">
-          <input
-            type="text"
-            placeholder="🔍 Поиск клана или тега..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 bg-black/40 border border-[#333] px-4 py-2 text-white focus:outline-none focus:border-blue-500 transition"
-          />
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setSelectedStatus('future')}
+              className={`px-4 py-2 text-sm uppercase tracking-wider transition ${
+                selectedStatus === 'future' 
+                  ? 'bg-blue-600/20 text-white border-b-2 border-blue-500' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Будущие
+            </button>
+            <button 
+              onClick={() => setSelectedStatus('active')}
+              className={`px-4 py-2 text-sm uppercase tracking-wider transition ${
+                selectedStatus === 'active' 
+                  ? 'bg-blue-600/20 text-white border-b-2 border-blue-500' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Активные
+            </button>
+          </div>
+
           <select
-            value={selectedTag}
-            onChange={(e) => setSelectedTag(e.target.value)}
+            value={selectedMode}
+            onChange={(e) => setSelectedMode(e.target.value)}
             className="bg-black/40 border border-[#333] px-4 py-2 text-white focus:outline-none focus:border-blue-500 transition"
           >
-            <option value="all">Все кланы</option>
-            <option value="Топ 10">Топ 10</option>
-            <option value="Топ 25">Топ 25</option>
-            <option value="Топ 50">Топ 50</option>
-            <option value="Топ 100">Топ 100</option>
+            <option value="all">Все режимы</option>
+            <option value="1v1">1vs1</option>
+            <option value="2v2">2vs2</option>
           </select>
         </div>
 
-        {/* Пустое состояние — кланов пока нет */}
-        <div className="border-2 border-dashed border-[#444] p-16 text-center">
-          <div className="text-gray-500 text-7xl mb-4">🏰</div>
-          <div className="text-gray-400 text-2xl uppercase tracking-wider mb-2">
-            Здесь пока нет кланов
+        {/* Список турниров */}
+        {tournaments.length > 0 ? (
+          <div className="grid gap-4">
+            {tournaments.map(t => (
+              <div key={t.id} className="bg-black/40 border border-[#333] p-4">
+                {/* Здесь будут турниры */}
+              </div>
+            ))}
           </div>
-          <p className="text-gray-500 text-sm mb-6">
-            Создай первый клан и пригласи друзей!
-          </p>
-          <button className="bg-[#2a2a2a] hover:bg-[#3a3a3a] border border-[#444] px-8 py-3 text-sm uppercase tracking-wider transition hover:scale-105">
-            ✨ Создать клан
-          </button>
-        </div>
+        ) : (
+          <div className="border-2 border-dashed border-[#444] p-16 text-center">
+            <div className="text-gray-500 text-7xl mb-4">🏆</div>
+            <div className="text-gray-400 text-2xl uppercase tracking-wider mb-2">
+              Здесь пока нет турниров
+            </div>
+            <p className="text-gray-500 text-sm mb-6">
+              Создай первый турнир и пригласи игроков!
+            </p>
+            <button className="bg-[#2a2a2a] hover:bg-[#3a3a3a] border border-[#444] px-8 py-3 text-sm uppercase tracking-wider transition hover:scale-105">
+              ✨ Создать турнир
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-export default Clans;
+export default Tournaments;
