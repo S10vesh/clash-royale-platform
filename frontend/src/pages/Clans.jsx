@@ -18,7 +18,7 @@ function Clans() {
   return (
     <div className="min-h-screen text-[#e0e0e0] flex flex-col">
       <Navigation />
-      
+      <div className="h-4"></div>
       <div className="flex-1 container-cs py-8">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-3xl font-bold uppercase tracking-wider">Кланы</h1>

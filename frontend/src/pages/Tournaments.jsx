@@ -11,7 +11,7 @@ function Tournaments() {
   return (
     <div className="min-h-screen text-[#e0e0e0] flex flex-col">
       <Navigation />
-      
+      <div className="h-4"></div>
       <div className="flex-1 container-cs py-8">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-3xl font-bold uppercase tracking-wider">Турниры</h1>
@@ -74,9 +74,7 @@ function Tournaments() {
             <p className="text-gray-500 text-sm mb-6">
               Создай первый турнир и пригласи игроков!
             </p>
-            <button className="bg-[#2a2a2a] hover:bg-[#3a3a3a] border border-[#444] px-8 py-3 text-sm uppercase tracking-wider transition hover:scale-105">
-              ✨ Создать турнир
-            </button>
+            {/* Нижняя кнопка УДАЛЕНА */}
           </div>
         )}
       </div>
