@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -17,6 +17,7 @@ class User(Base):
     
     tournaments_created = relationship("Tournament", back_populates="creator")
     clans_joined = relationship("ClanMember", back_populates="user")
+    tournament_participations = relationship("TournamentParticipant", back_populates="user")
 
 
 class Tournament(Base):
@@ -33,6 +34,22 @@ class Tournament(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     creator = relationship("User", back_populates="tournaments_created")
+    participants = relationship("TournamentParticipant", back_populates="tournament")
+
+
+class TournamentParticipant(Base):
+    __tablename__ = "tournament_participants"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    tournament_id = Column(Integer, ForeignKey("tournaments.id"), nullable=False)
+    joined_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Уникальное ограничение: пользователь может быть в турнире только 1 раз
+    __table_args__ = (UniqueConstraint('user_id', 'tournament_id', name='unique_user_tournament'),)
+    
+    user = relationship("User", back_populates="tournament_participations")
+    tournament = relationship("Tournament", back_populates="participants")
 
 
 class Clan(Base):

@@ -7,6 +7,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Rules from './pages/Rules'
 import Tournaments from './pages/Tournaments'
+import TournamentDetails from './pages/TournamentDetails'
 import Leaderboard from './pages/Leaderboard'
 import Clans from './pages/Clans'
 import Help from './pages/Help'
@@ -17,7 +18,7 @@ function ProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+      <div className="flex items-center justify-center h-screen text-white">
         <div className="text-xl">Загрузка...</div>
       </div>
     )
@@ -32,8 +33,8 @@ function ProtectedRoute({ children }) {
 
 function App() {
   return (
-    // 🔧 Убрал bg-gray-900 — теперь фон из index.css будет виден
-    <div className="min-h-screen w-screen overflow-auto">
+    // 🔧 Убрал bg-gray-900 — теперь фон из index.css виден
+    <div className="min-h-screen w-full overflow-x-hidden overflow-y-auto">
       <Routes>
         {/* Публичные роуты */}
         <Route path="/" element={<Home />} />
@@ -48,6 +49,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Tournaments />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tournaments/:id"
+          element={
+            <ProtectedRoute>
+              <TournamentDetails />
             </ProtectedRoute>
           }
         />

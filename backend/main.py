@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List
 
 from database import engine, Base, get_db
-from models import User, Tournament, Clan, ClanMember
+from models import User, Tournament, Clan, ClanMember, TournamentParticipant
 from auth import (
     get_password_hash, verify_password, create_access_token,
     get_current_user, validate_email, validate_password, validate_username,
@@ -78,7 +78,7 @@ class UserResponse(BaseModel):
     created_at: datetime
     
     class Config:
-        orm_mode = True  # ← Важно для Pydantic v1!
+        orm_mode = True
 
 
 class TokenResponse(BaseModel):
@@ -113,6 +113,19 @@ class TournamentResponse(BaseModel):
     max_players: int
     status: str
     created_by: int
+    participants_count: int = 0
+    is_joined: bool = False
+    
+    class Config:
+        orm_mode = True
+
+
+class TournamentParticipantResponse(BaseModel):
+    id: int
+    user_id: int
+    username: str
+    clash_tag: Optional[str]
+    joined_at: datetime
     
     class Config:
         orm_mode = True
@@ -211,19 +224,111 @@ def get_me(current_user: User = Depends(get_current_user)):
 # ==================== 🏆 Tournament эндпоинты ====================
 
 @app.get("/api/tournaments", response_model=List[TournamentResponse])
-def get_tournaments(status_filter: Optional[str] = None, db: Session = Depends(get_db)):
-    query = db.query(Tournament)
-    if status_filter in ["future", "active", "past"]:
-        query = query.filter(Tournament.status == status_filter)
-    return query.all()
+def get_tournaments(
+    status_filter: Optional[str] = None, 
+    mode_filter: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # 🔧 Используем локальное время (без timezone) для сравнения с SQLite
+    now = datetime.now()
+    tournaments = db.query(Tournament).all()
+    
+    # Вычисляем статусы на лету (не сохраняем в БД)
+    result = []
+    for t in tournaments:
+        # 🔧 Дата из SQLite уже naive, не добавляем tzinfo
+        tournament_date = t.date
+        time_until_start = tournament_date - now
+        
+        if tournament_date + timedelta(hours=2) <= now:
+            status = "past"
+        elif time_until_start <= timedelta(hours=24):
+            status = "active"
+        else:
+            status = "future"
+        
+        participants_count = db.query(TournamentParticipant).filter(
+            TournamentParticipant.tournament_id == t.id
+        ).count()
+        
+        is_joined = db.query(TournamentParticipant).filter(
+            TournamentParticipant.tournament_id == t.id,
+            TournamentParticipant.user_id == current_user.id
+        ).first() is not None
+        
+        result.append({
+            "id": t.id,
+            "name": t.name,
+            "date": t.date,
+            "prize": t.prize,
+            "mode": t.mode,
+            "max_players": t.max_players,
+            "status": status,
+            "created_by": t.created_by,
+            "participants_count": participants_count,
+            "is_joined": is_joined
+        })
+    
+    # Фильтрация по статусу
+    if status_filter:
+        result = [t for t in result if t["status"] == status_filter]
+    
+    # Фильтрация по режиму
+    if mode_filter:
+        result = [t for t in result if t["mode"] == mode_filter]
+    
+    return result
 
 
+# 🔧 ИСПРАВЛЕНО: возвращаем те же поля, что и в списке
 @app.get("/api/tournaments/{tournament_id}", response_model=TournamentResponse)
-def get_tournament(tournament_id: int, db: Session = Depends(get_db)):
+def get_tournament(
+    tournament_id: int, 
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
     if not tournament:
         raise HTTPException(status_code=404, detail="Турнир не найден")
-    return tournament
+    
+    # 🔧 Используем локальное время (без timezone) для сравнения
+    now = datetime.now()
+    tournament_date = tournament.date
+    
+    time_until_start = tournament_date - now
+    
+    if tournament_date + timedelta(hours=2) <= now:
+        status = "past"
+    elif time_until_start <= timedelta(hours=24):
+        status = "active"
+    else:
+        status = "future"
+    
+    # Считаем участников
+    participants_count = db.query(TournamentParticipant).filter(
+        TournamentParticipant.tournament_id == tournament_id
+    ).count()
+    
+    # Проверяем, участвует ли текущий пользователь
+    is_joined = db.query(TournamentParticipant).filter(
+        TournamentParticipant.tournament_id == tournament_id,
+        TournamentParticipant.user_id == current_user.id
+    ).first() is not None
+    
+    # Возвращаем полный объект с дополнительными полями
+    return {
+        "id": tournament.id,
+        "name": tournament.name,
+        "date": tournament.date,
+        "prize": tournament.prize,
+        "mode": tournament.mode,
+        "max_players": tournament.max_players,
+        "status": status,
+        "created_by": tournament.created_by,
+        "participants_count": participants_count,
+        "is_joined": is_joined
+    }
 
 
 @app.post("/api/tournaments", response_model=TournamentResponse, status_code=status.HTTP_201_CREATED)
@@ -232,6 +337,13 @@ def create_tournament(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # 🔧 Используем локальное время для валидации
+    now = datetime.now()
+    tournament_date = tournament.date
+    
+    if tournament_date <= now:
+        raise HTTPException(status_code=400, detail="Нельзя создать турнир с датой в прошлом")
+    
     new_tournament = Tournament(
         **tournament.dict(),
         created_by=current_user.id,
@@ -241,6 +353,98 @@ def create_tournament(
     db.commit()
     db.refresh(new_tournament)
     return new_tournament
+
+
+# ==================== 🎮 Tournament Participation ====================
+
+@app.post("/api/tournaments/{tournament_id}/join", status_code=status.HTTP_200_OK)
+def join_tournament(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Турнир не найден")
+    
+    # 🔧 Используем локальное время
+    now = datetime.now()
+    tournament_date = tournament.date
+    if tournament_date <= now:
+        raise HTTPException(status_code=400, detail="Нельзя вступить в начавшийся турнир")
+    
+    existing = db.query(TournamentParticipant).filter(
+        TournamentParticipant.user_id == current_user.id,
+        TournamentParticipant.tournament_id == tournament_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Вы уже участвуете в этом турнире")
+    
+    participants_count = db.query(TournamentParticipant).filter(
+        TournamentParticipant.tournament_id == tournament_id
+    ).count()
+    if participants_count >= tournament.max_players:
+        raise HTTPException(status_code=400, detail="В турнире нет свободных мест")
+    
+    participant = TournamentParticipant(
+        user_id=current_user.id,
+        tournament_id=tournament_id
+    )
+    db.add(participant)
+    db.commit()
+    
+    return {"message": "Вы успешно присоединились к турниру"}
+
+
+@app.post("/api/tournaments/{tournament_id}/leave", status_code=status.HTTP_200_OK)
+def leave_tournament(
+    tournament_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Турнир не найден")
+    
+    participant = db.query(TournamentParticipant).filter(
+        TournamentParticipant.user_id == current_user.id,
+        TournamentParticipant.tournament_id == tournament_id
+    ).first()
+    if not participant:
+        raise HTTPException(status_code=400, detail="Вы не участвуете в этом турнире")
+    
+    db.delete(participant)
+    db.commit()
+    
+    return {"message": "Вы вышли из турнира"}
+
+
+@app.get("/api/tournaments/{tournament_id}/participants", response_model=List[TournamentParticipantResponse])
+def get_tournament_participants(
+    tournament_id: int,
+    db: Session = Depends(get_db)
+):
+    tournament = db.query(Tournament).filter(Tournament.id == tournament_id).first()
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Турнир не найден")
+    
+    participants = db.query(TournamentParticipant).filter(
+        TournamentParticipant.tournament_id == tournament_id
+    ).all()
+    
+    result = []
+    for p in participants:
+        user = db.query(User).filter(User.id == p.user_id).first()
+        if user:
+            result.append({
+                "id": p.id,
+                "user_id": p.user_id,
+                "username": user.username,
+                "clash_tag": user.clash_tag,
+                "joined_at": p.joined_at
+            })
+    
+    return result
 
 
 # ==================== 👥 Clan эндпоинты ====================

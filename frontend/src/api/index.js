@@ -25,7 +25,6 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Токен истёк - выходим
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       window.location.href = '/login'
@@ -37,7 +36,6 @@ api.interceptors.response.use(
 // ==================== 🔐 Auth ====================
 
 export const authAPI = {
-  // Регистрация
   register: (data) => 
     api.post('/register', {
       username: data.username,
@@ -46,14 +44,11 @@ export const authAPI = {
       confirm_password: data.confirmPassword,
     }),
 
-  // Вход
   login: (username, password) => 
     api.post('/login', { username, password }),
 
-  // Получить текущего пользователя
   getMe: () => api.get('/users/me'),
 
-  // Выйти
   logout: () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
@@ -63,23 +58,29 @@ export const authAPI = {
 // ==================== 🏆 Tournaments ====================
 
 export const tournamentsAPI = {
-  // Получить все турниры
-  getAll: (status = null) => {
-    const params = status ? { status } : {}
+  getAll: (status = null, mode = null) => {
+    const params = {}
+    if (status && status !== 'all') params.status_filter = status
+    if (mode && mode !== 'all') params.mode_filter = mode
+    
+    console.log('📡 Запрос турниров с параметрами:', params)
+    
     return api.get('/tournaments', { params })
   },
 
-  // Получить турнир по ID
   getById: (id) => api.get(`/tournaments/${id}`),
 
-  // Создать турнир
   create: (data) => api.post('/tournaments', data),
+
+  // 🔧 НОВЫЕ: Участие в турнире
+  join: (id) => api.post(`/tournaments/${id}/join`),
+  leave: (id) => api.post(`/tournaments/${id}/leave`),
+  getParticipants: (id) => api.get(`/tournaments/${id}/participants`),
 }
 
 // ==================== 👥 Clans ====================
 
 export const clansAPI = {
-  // Получить все кланы
   getAll: (search = null, tag = null) => {
     const params = {}
     if (search) params.search = search
@@ -87,20 +88,16 @@ export const clansAPI = {
     return api.get('/clans', { params })
   },
 
-  // Получить клан по ID
   getById: (id) => api.get(`/clans/${id}`),
 
-  // Создать клан
   create: (data) => api.post('/clans', data),
 
-  // Вступить в клан
   join: (id) => api.post(`/clans/${id}/join`),
 }
 
 // ==================== 📊 Leaderboard ====================
 
 export const leaderboardAPI = {
-  // Получить таблицу лидеров
   get: (limit = 10) => api.get('/leaderboard', { params: { limit } }),
 }
 
