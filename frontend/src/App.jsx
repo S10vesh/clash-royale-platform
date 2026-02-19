@@ -5,6 +5,7 @@ import { useAuth } from './hooks/useAuth'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import Rules from './pages/Rules'
 import Tournaments from './pages/Tournaments'
 import Leaderboard from './pages/Leaderboard'
 import Clans from './pages/Clans'
@@ -31,12 +32,14 @@ function ProtectedRoute({ children }) {
 
 function App() {
   return (
-    <div className="h-screen w-screen overflow-hidden">
+    // 🔧 Убрал bg-gray-900 — теперь фон из index.css будет виден
+    <div className="min-h-screen w-screen overflow-auto">
       <Routes>
         {/* Публичные роуты */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/rules" element={<Rules />} />
         <Route path="/help" element={<Help />} />
 
         {/* Защищённые роуты */}

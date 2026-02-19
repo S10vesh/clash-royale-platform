@@ -143,6 +143,22 @@ function Register() {
                 placeholder="••••••••"
               />
             </div>
+
+            {/* Чекбокс согласия с правилами */}
+            <div className="flex items-start gap-2 pt-2">
+              <input 
+                type="checkbox" 
+                id="agree" 
+                required
+                className="mt-1 accent-blue-500"
+              />
+              <label htmlFor="agree" className="text-xs text-gray-500 leading-tight">
+                Я согласен с{' '}
+                <Link to="/rules" target="_blank" className="text-blue-500 hover:text-blue-400 underline">
+                  правилами платформы
+                </Link>
+              </label>
+            </div>
             
             <button 
               type="submit"
