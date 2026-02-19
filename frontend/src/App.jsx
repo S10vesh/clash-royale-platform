@@ -6,6 +6,7 @@ import Tournaments from './pages/Tournaments';
 import Leaderboard from './pages/Leaderboard';
 import Clans from './pages/Clans';
 import Help from './pages/Help';
+import Terms from './pages/Terms';  // ← ДОБАВИЛИ ИМПОРТ
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/clans" element={<Clans />} />
           <Route path="/help" element={<Help />} />
+          <Route path="/terms" element={<Terms />} />  {/* ← ДОБАВИЛИ МАРШРУТ */}
         </Routes>
       </div>
     </BrowserRouter>

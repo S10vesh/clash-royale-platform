@@ -106,10 +106,14 @@ function Register() {
               />
             </div>
 
+            {/* ИСПРАВЛЕННЫЙ БЛОК С УСЛОВИЯМИ */}
             <div className="flex items-center gap-2 text-sm">
               <input type="checkbox" id="terms" required className="accent-blue-500" />
               <label htmlFor="terms" className="text-gray-400">
-                Я принимаю <span className="text-blue-500 hover:text-blue-400 cursor-pointer">условия использования</span>
+                Я принимаю{' '}
+                <Link to="/terms" className="text-blue-500 hover:text-blue-400">
+                  условия использования
+                </Link>
               </label>
             </div>
             

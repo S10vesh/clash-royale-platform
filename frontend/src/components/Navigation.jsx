@@ -8,11 +8,11 @@ function Navigation() {
   return (
     <div className="border-b border-[#333] bg-black/40 backdrop-blur-md">
       <div className="container-cs flex items-center justify-between py-5">
-        {/* Логотип и меню — ещё крупнее */}
+        {/* Логотип и меню */}
         <div className="flex items-center gap-12">
           <h1 className="text-3xl font-bold text-white tracking-wider">CLASH ROYALE</h1>
           
-          {/* Меню — крупнее и с большими отступами */}
+          {/* Меню */}
           <div className="flex gap-10 text-lg uppercase tracking-wider">
             <Link 
               to="/" 
@@ -47,8 +47,8 @@ function Navigation() {
           </div>
         </div>
 
-        {/* КНОПКИ — чуть крупнее, но всё ещё аккуратные */}
-        <div className="flex items-center gap-4">
+        {/* КНОПКИ — сдвинуты ВЛЕВО с mr-20 */}
+        <div className="flex items-center gap-4 mr-20">
           <Link 
             to="/login" 
             className="px-7 py-1 border border-gray-600 text-white text-sm uppercase tracking-wider rounded-md hover:border-blue-500 hover:scale-105 hover:bg-blue-500/10 transition-all duration-300 font-medium"
