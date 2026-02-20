@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field, validator
 from datetime import datetime, timedelta
 from typing import Optional, List
+import pytz  # ← Добавь эту строку в импорты
 
 from database import engine, Base, get_db
 from models import User, Tournament, Clan, ClanMember, TournamentParticipant
@@ -160,6 +161,27 @@ class LeaderboardEntry(BaseModel):
     clan_tag: Optional[str]
 
 
+# ==================== 🔧 Helper функции ====================
+
+def to_local(dt: datetime) -> datetime:
+    """
+    Конвертирует datetime в локальное время (без timezone info)
+    - Если дата с timezone (UTC) → конвертирует в локальное время
+    - Если дата без timezone → возвращает как есть
+    """
+    if dt is None:
+        return datetime.now()
+    
+    # Если дата с timezone (например UTC)
+    if dt.tzinfo is not None:
+        # Конвертируем в локальное время
+        local_tz = pytz.timezone('Europe/Moscow')  # 🔧 Укажи свой часовой пояс!
+        return dt.astimezone(local_tz).replace(tzinfo=None)
+    
+    # Если уже naive — возвращаем как есть
+    return dt
+
+
 # ==================== 🔐 Auth эндпоинты ====================
 
 @app.post("/api/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -230,15 +252,12 @@ def get_tournaments(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # 🔧 Используем локальное время (без timezone) для сравнения с SQLite
-    now = datetime.now()
+    now = datetime.now()  # naive local time
     tournaments = db.query(Tournament).all()
     
-    # Вычисляем статусы на лету (не сохраняем в БД)
     result = []
     for t in tournaments:
-        # 🔧 Дата из SQLite уже naive, не добавляем tzinfo
-        tournament_date = t.date
+        tournament_date = to_local(t.date)  # 🔧 Конвертируем в локальное время
         time_until_start = tournament_date - now
         
         if tournament_date + timedelta(hours=2) <= now:
@@ -270,18 +289,15 @@ def get_tournaments(
             "is_joined": is_joined
         })
     
-    # Фильтрация по статусу
     if status_filter:
         result = [t for t in result if t["status"] == status_filter]
     
-    # Фильтрация по режиму
     if mode_filter:
         result = [t for t in result if t["mode"] == mode_filter]
     
     return result
 
 
-# 🔧 ИСПРАВЛЕНО: возвращаем те же поля, что и в списке
 @app.get("/api/tournaments/{tournament_id}", response_model=TournamentResponse)
 def get_tournament(
     tournament_id: int, 
@@ -292,10 +308,8 @@ def get_tournament(
     if not tournament:
         raise HTTPException(status_code=404, detail="Турнир не найден")
     
-    # 🔧 Используем локальное время (без timezone) для сравнения
-    now = datetime.now()
-    tournament_date = tournament.date
-    
+    now = datetime.now()  # naive local time
+    tournament_date = to_local(tournament.date)  # 🔧 Конвертируем в локальное время
     time_until_start = tournament_date - now
     
     if tournament_date + timedelta(hours=2) <= now:
@@ -305,18 +319,15 @@ def get_tournament(
     else:
         status = "future"
     
-    # Считаем участников
     participants_count = db.query(TournamentParticipant).filter(
         TournamentParticipant.tournament_id == tournament_id
     ).count()
     
-    # Проверяем, участвует ли текущий пользователь
     is_joined = db.query(TournamentParticipant).filter(
         TournamentParticipant.tournament_id == tournament_id,
         TournamentParticipant.user_id == current_user.id
     ).first() is not None
     
-    # Возвращаем полный объект с дополнительными полями
     return {
         "id": tournament.id,
         "name": tournament.name,
@@ -337,9 +348,8 @@ def create_tournament(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # 🔧 Используем локальное время для валидации
-    now = datetime.now()
-    tournament_date = tournament.date
+    now = datetime.now()  # naive local time
+    tournament_date = to_local(tournament.date)  # 🔧 Конвертируем UTC → локальное
     
     if tournament_date <= now:
         raise HTTPException(status_code=400, detail="Нельзя создать турнир с датой в прошлом")
@@ -367,9 +377,8 @@ def join_tournament(
     if not tournament:
         raise HTTPException(status_code=404, detail="Турнир не найден")
     
-    # 🔧 Используем локальное время
-    now = datetime.now()
-    tournament_date = tournament.date
+    now = datetime.now()  # naive local time
+    tournament_date = to_local(tournament.date)  # 🔧 Конвертируем в локальное время
     if tournament_date <= now:
         raise HTTPException(status_code=400, detail="Нельзя вступить в начавшийся турнир")
     

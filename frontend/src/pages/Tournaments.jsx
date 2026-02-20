@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';  // 🔧 Добавлен импорт Link
+import { Link } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import { tournamentsAPI } from '../api';
 
@@ -66,6 +66,31 @@ function Tournaments() {
     return now.toISOString().slice(0, 16);
   };
 
+  // 🔧 ИСПРАВЛЕНА: правильная обработка ошибок от бэкенда
+  const getErrorMessage = (err) => {
+    const detail = err.response?.data?.detail;
+    
+    if (!detail) return 'Ошибка создания турнира';
+    
+    // Если detail — массив (ошибки валидации Pydantic)
+    if (Array.isArray(detail)) {
+      // Берём первое сообщение об ошибке
+      return detail[0]?.msg || 'Ошибка валидации данных';
+    }
+    
+    // Если detail — строка
+    if (typeof detail === 'string') {
+      return detail;
+    }
+    
+    // Если detail — объект
+    if (typeof detail === 'object') {
+      return detail.msg || JSON.stringify(detail);
+    }
+    
+    return 'Ошибка создания турнира';
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
@@ -113,14 +138,14 @@ function Tournaments() {
       setIsModalOpen(false);
       setFormData({ name: '', date: '', prize: '', mode: '1v1', max_players: 16 });
       
-      setTimeout(() => {
-        fetchTournaments();
-      }, 300);
+      // 🔧 Перезагружаем турниры
+      await fetchTournaments();
       
     } catch (err) {
       console.error('Ошибка создания турнира:', err);
-      const msg = err.response?.data?.detail || 'Ошибка создания турнира';
-      setFormError(msg);
+      // 🔧 Используем правильную обработку ошибки
+      const errorMsg = getErrorMessage(err);
+      setFormError(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -133,7 +158,7 @@ function Tournaments() {
       fetchTournaments();
     } catch (err) {
       const msg = err.response?.data?.detail || 'Ошибка при вступлении в турнир';
-      alert('❌ ' + msg);
+      alert('❌ ' + (typeof msg === 'string' ? msg : JSON.stringify(msg)));
     }
   };
 
@@ -146,7 +171,7 @@ function Tournaments() {
       fetchTournaments();
     } catch (err) {
       const msg = err.response?.data?.detail || 'Ошибка при выходе из турнира';
-      alert('❌ ' + msg);
+      alert('❌ ' + (typeof msg === 'string' ? msg : JSON.stringify(msg)));
     }
   };
 
