@@ -3,9 +3,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field, validator
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
-import pytz  # ← Добавь эту строку в импорты
+import pytz
 
 from database import engine, Base, get_db
 from models import User, Tournament, Clan, ClanMember, TournamentParticipant
@@ -161,25 +161,24 @@ class LeaderboardEntry(BaseModel):
     clan_tag: Optional[str]
 
 
-# ==================== 🔧 Helper функции ====================
+# ==================== 🔧 Helper функции (UTC) ====================
 
-def to_local(dt: datetime) -> datetime:
+def ensure_utc(dt: datetime) -> datetime:
     """
-    Конвертирует datetime в локальное время (без timezone info)
-    - Если дата с timezone (UTC) → конвертирует в локальное время
-    - Если дата без timezone → возвращает как есть
+    Гарантирует, что datetime имеет timezone UTC.
+    - Если нет timezone → считаем что это UTC и добавляем
+    - Если есть timezone → конвертируем в UTC
     """
-    if dt is None:
-        return datetime.now()
-    
-    # Если дата с timezone (например UTC)
-    if dt.tzinfo is not None:
-        # Конвертируем в локальное время
-        local_tz = pytz.timezone('Europe/Moscow')  # 🔧 Укажи свой часовой пояс!
-        return dt.astimezone(local_tz).replace(tzinfo=None)
-    
-    # Если уже naive — возвращаем как есть
-    return dt
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def model_to_dict(model):
+    """Совместимость с Pydantic v1 и v2"""
+    if hasattr(model, 'model_dump'):
+        return model.model_dump()
+    return model.dict()
 
 
 # ==================== 🔐 Auth эндпоинты ====================
@@ -252,15 +251,17 @@ def get_tournaments(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    now = datetime.now()  # naive local time
+    now_utc = datetime.now(timezone.utc)  # ✅ Текущее время в UTC
     tournaments = db.query(Tournament).all()
     
     result = []
     for t in tournaments:
-        tournament_date = to_local(t.date)  # 🔧 Конвертируем в локальное время
-        time_until_start = tournament_date - now
+        # 🔧 Конвертируем дату турнира в UTC для сравнения
+        tournament_date_utc = ensure_utc(t.date)
+        time_until_start = tournament_date_utc - now_utc
         
-        if tournament_date + timedelta(hours=2) <= now:
+        # Определяем статус на основе UTC
+        if tournament_date_utc + timedelta(hours=2) <= now_utc:
             status = "past"
         elif time_until_start <= timedelta(hours=24):
             status = "active"
@@ -279,7 +280,7 @@ def get_tournaments(
         result.append({
             "id": t.id,
             "name": t.name,
-            "date": t.date,
+            "date": t.date,  # Отправляем как есть (UTC)
             "prize": t.prize,
             "mode": t.mode,
             "max_players": t.max_players,
@@ -308,11 +309,11 @@ def get_tournament(
     if not tournament:
         raise HTTPException(status_code=404, detail="Турнир не найден")
     
-    now = datetime.now()  # naive local time
-    tournament_date = to_local(tournament.date)  # 🔧 Конвертируем в локальное время
-    time_until_start = tournament_date - now
+    now_utc = datetime.now(timezone.utc)
+    tournament_date_utc = ensure_utc(tournament.date)
+    time_until_start = tournament_date_utc - now_utc
     
-    if tournament_date + timedelta(hours=2) <= now:
+    if tournament_date_utc + timedelta(hours=2) <= now_utc:
         status = "past"
     elif time_until_start <= timedelta(hours=24):
         status = "active"
@@ -348,14 +349,20 @@ def create_tournament(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    now = datetime.now()  # naive local time
-    tournament_date = to_local(tournament.date)  # 🔧 Конвертируем UTC → локальное
+    # 🔧 Конвертируем входящую дату в UTC
+    tournament_date_utc = ensure_utc(tournament.date)
+    now_utc = datetime.now(timezone.utc)
     
-    if tournament_date <= now:
+    # Проверяем что дата не в прошлом (в UTC)
+    if tournament_date_utc <= now_utc:
         raise HTTPException(status_code=400, detail="Нельзя создать турнир с датой в прошлом")
     
     new_tournament = Tournament(
-        **tournament.dict(),
+        name=tournament.name,
+        date=tournament_date_utc,  # ✅ Сохраняем в UTC
+        prize=tournament.prize,
+        mode=tournament.mode,
+        max_players=tournament.max_players,
         created_by=current_user.id,
         status="future"
     )
@@ -377,9 +384,11 @@ def join_tournament(
     if not tournament:
         raise HTTPException(status_code=404, detail="Турнир не найден")
     
-    now = datetime.now()  # naive local time
-    tournament_date = to_local(tournament.date)  # 🔧 Конвертируем в локальное время
-    if tournament_date <= now:
+    now_utc = datetime.now(timezone.utc)
+    tournament_date_utc = ensure_utc(tournament.date)
+    
+    # Проверяем что турнир ещё не начался (в UTC)
+    if tournament_date_utc <= now_utc:
         raise HTTPException(status_code=400, detail="Нельзя вступить в начавшийся турнир")
     
     existing = db.query(TournamentParticipant).filter(
@@ -485,7 +494,7 @@ def create_clan(
     if db.query(Clan).filter(Clan.tag == clan.tag.upper()).first():
         raise HTTPException(status_code=400, detail="Клан с таким тегом уже существует")
     
-    new_clan = Clan(**clan.dict())
+    new_clan = Clan(**model_to_dict(clan))
     db.add(new_clan)
     db.commit()
     db.refresh(new_clan)
