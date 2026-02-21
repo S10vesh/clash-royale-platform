@@ -119,6 +119,10 @@ class TournamentResponse(BaseModel):
     
     class Config:
         orm_mode = True
+        # 🔧 Гарантируем что дата возвращается с timezone (Z в конце)
+        json_encoders = {
+            datetime: lambda dt: dt.replace(tzinfo=timezone.utc).isoformat().replace('+00:00', 'Z')
+        }
 
 
 class TournamentParticipantResponse(BaseModel):
