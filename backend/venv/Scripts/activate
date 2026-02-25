@@ -35,7 +35,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\slovesh\clash-royale-platform\backend\venv"
+VIRTUAL_ENV="C:\Users\lal50\OneDrive\Рабочий стол\clash-royale-platform\backend\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

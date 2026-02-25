@@ -1,6 +1,17 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
+// 🔧 АВАТАРКИ С ЖИВОТНЫМИ (с цветами)
+const AVATARS = {
+  'default': { emoji: '👤', color: '#2563eb', gradient: 'from-blue-600/20 to-blue-800/20', border: 'border-blue-500/50', shadow: 'shadow-blue-600/30' },
+  'lion': { emoji: '🦁', color: '#eab308', gradient: 'from-yellow-500/20 to-amber-600/20', border: 'border-yellow-400/50', shadow: 'shadow-yellow-500/30' },
+  'dog': { emoji: '🐶', color: '#b45309', gradient: 'from-amber-700/20 to-orange-800/20', border: 'border-amber-600/50', shadow: 'shadow-amber-700/30' },
+  'cat': { emoji: '🐱', color: '#f97316', gradient: 'from-orange-500/20 to-orange-600/20', border: 'border-orange-400/50', shadow: 'shadow-orange-500/30' },
+  'panda': { emoji: '🐼', color: '#1f2937', gradient: 'from-gray-700/20 to-gray-800/20', border: 'border-gray-600/50', shadow: 'shadow-gray-700/30' },
+  'koala': { emoji: '🐨', color: '#64748b', gradient: 'from-slate-500/20 to-slate-600/20', border: 'border-slate-400/50', shadow: 'shadow-slate-500/30' },
+  'tiger': { emoji: '🐯', color: '#ea580c', gradient: 'from-orange-600/20 to-red-700/20', border: 'border-orange-500/50', shadow: 'shadow-orange-600/30' },
+};
+
 function Navigation() {
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -11,6 +22,14 @@ function Navigation() {
     logout();
     window.location.href = '/login';
   };
+
+  // 🔧 Получить текущую аватарку из localStorage или дефолт
+  const getCurrentAvatar = () => {
+    const savedAvatar = localStorage.getItem('userAvatar') || 'default';
+    return AVATARS[savedAvatar] || AVATARS['default'];
+  };
+
+  const avatar = getCurrentAvatar();
 
   return (
     <div className="border-b border-[#333] bg-black/40 backdrop-blur-md">
@@ -57,22 +76,31 @@ function Navigation() {
         {/* Правая часть: Авторизация или Профиль пользователя */}
         <div className="flex items-center gap-4">
           {user ? (
-            // ✅ Авторизован: показываем инфо о пользователе (кликабельный профиль)
+            // ✅ Авторизован: показываем инфо о пользователе
             <>
-              {/* 🔧 Профиль — кликабельный с hover-эффектом */}
+              {/* 🔧 Профиль — с динамической обводкой и фоном в цвет аватарки */}
               <Link 
                 to="/profile"
-                className="flex items-center gap-3 px-5 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/50 rounded-md transition-all duration-300 hover:scale-110 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/30 cursor-pointer"
+                className="flex items-center gap-3 px-5 py-2 rounded-md transition-all duration-300 hover:scale-110 cursor-pointer"
+                style={{ 
+                  backgroundColor: `${avatar.color}20`,
+                  borderColor: avatar.color,
+                  borderWidth: '1px',
+                  borderStyle: 'solid'
+                }}
               >
-                {/* Аватарка с первой буквой */}
-                <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-600/30">
-                  <span className="text-white font-bold text-sm">
-                    {user.username?.charAt(0).toUpperCase()}
+                {/* 🔧 Аватарка с животным */}
+                <div 
+                  className="w-9 h-9 rounded-full flex items-center justify-center shadow-lg"
+                  style={{ backgroundColor: avatar.color }}
+                >
+                  <span className="text-white font-bold text-lg">
+                    {avatar.emoji}
                   </span>
                 </div>
-                {/* Инфо */}
+                {/* Инфо — ник белый, почта серая как была */}
                 <div>
-                  <p className="text-blue-400 font-semibold text-sm tracking-wider">
+                  <p className="text-white font-semibold text-sm tracking-wider">
                     {user.username}
                   </p>
                   <p className="text-gray-500 text-xs">

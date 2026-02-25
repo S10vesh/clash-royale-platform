@@ -3,6 +3,20 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import { tournamentsAPI } from '../api';
 
+// Флаги стран
+const COUNTRIES = [
+  { code: 'RU', name: 'Россия', flag: 'https://flagcdn.com/w40/ru.png' },
+  { code: 'US', name: 'США', flag: 'https://flagcdn.com/w40/us.png' },
+  { code: 'DE', name: 'Германия', flag: 'https://flagcdn.com/w40/de.png' },
+  { code: 'FR', name: 'Франция', flag: 'https://flagcdn.com/w40/fr.png' },
+  { code: 'GB', name: 'Великобритания', flag: 'https://flagcdn.com/w40/gb.png' },
+  { code: 'CN', name: 'Китай', flag: 'https://flagcdn.com/w40/cn.png' },
+  { code: 'BR', name: 'Бразилия', flag: 'https://flagcdn.com/w40/br.png' },
+  { code: 'UA', name: 'Украина', flag: 'https://flagcdn.com/w40/ua.png' },
+  { code: 'KZ', name: 'Казахстан', flag: 'https://flagcdn.com/w40/kz.png' },
+  { code: 'BY', name: 'Беларусь', flag: 'https://flagcdn.com/w40/by.png' },
+];
+
 function TournamentDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -206,30 +220,43 @@ function TournamentDetails() {
           
           {participants.length > 0 ? (
             <div className="space-y-2">
-              {participants.map((p, index) => (
-                <div 
-                  key={p.id} 
-                  className="flex items-center justify-between bg-black/40 border border-[#333] p-4 rounded hover:border-[#555] transition"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-blue-600/20 rounded-full flex items-center justify-center text-blue-400 font-bold text-lg">
-                      {index + 1}
+              {participants.map((p, index) => {
+                // 🔧 Находим флаг по country_code
+                const country = COUNTRIES.find(c => c.code === p.country_code);
+                const flag = country ? country.flag : 'https://flagcdn.com/w40/ru.png';
+                
+                return (
+                  <div 
+                    key={p.id} 
+                    className="flex items-center justify-between bg-black/40 border border-[#333] p-4 rounded hover:border-[#555] transition"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-blue-600/20 rounded-full flex items-center justify-center text-blue-400 font-bold text-lg">
+                        {index + 1}
+                      </div>
+                      {/* 🔧 ФЛАГ */}
+                      <img 
+                        src={flag} 
+                        alt={country?.name || 'Flag'}
+                        className="w-8 h-6 object-cover rounded shadow-sm"
+                        title={country?.name || 'Unknown'}
+                      />
+                      <div>
+                        <p className="text-white font-semibold">{p.username}</p>
+                        {p.clash_tag && (
+                          <p className="text-gray-500 text-sm">🏷️ {p.clash_tag}</p>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-white font-semibold">{p.username}</p>
-                      {p.clash_tag && (
-                        <p className="text-gray-500 text-sm">🏷️ {p.clash_tag}</p>
-                      )}
+                    <div className="text-gray-500 text-sm">
+                      <p>Присоединился</p>
+                      <p className="text-gray-400">
+                        {new Date(p.joined_at).toLocaleDateString('ru-RU')}
+                      </p>
                     </div>
                   </div>
-                  <div className="text-gray-500 text-sm">
-                    <p>Присоединился</p>
-                    <p className="text-gray-400">
-                      {new Date(p.joined_at).toLocaleDateString('ru-RU')}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-12 text-gray-500">

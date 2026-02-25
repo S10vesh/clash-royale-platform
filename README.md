@@ -14,3 +14,8 @@ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 бекэнд сайт чтоб проверять все
 http://localhost:8000/docs
+
+удалить старый venv в cd backend
+Remove-Item -Recurse -Force venv
+
+удалить старый pycache в cd backend

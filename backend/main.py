@@ -76,10 +76,26 @@ class UserResponse(BaseModel):
     email: str
     role: str
     clash_tag: Optional[str]
+    country_code: Optional[str] = None
     created_at: datetime
     
     class Config:
         orm_mode = True
+
+
+class UserUpdate(BaseModel):
+    clash_tag: Optional[str] = None
+    country_code: Optional[str] = None
+    
+    @validator('clash_tag')
+    def clash_tag_valid(cls, v):
+        if v:
+            if not v.startswith('#'):
+                raise ValueError("Clash Tag должен начинаться с #")
+            if len(v) < 4 or len(v) > 10:
+                raise ValueError("Clash Tag должен быть от 4 до 10 символов")
+            return v.upper()
+        return v
 
 
 class TokenResponse(BaseModel):
@@ -119,7 +135,6 @@ class TournamentResponse(BaseModel):
     
     class Config:
         orm_mode = True
-        # 🔧 Гарантируем что дата возвращается с timezone (Z в конце)
         json_encoders = {
             datetime: lambda dt: dt.replace(tzinfo=timezone.utc).isoformat().replace('+00:00', 'Z')
         }
@@ -130,6 +145,8 @@ class TournamentParticipantResponse(BaseModel):
     user_id: int
     username: str
     clash_tag: Optional[str]
+    country_code: Optional[str] = None
+    country_flag: Optional[str] = None
     joined_at: datetime
     
     class Config:
@@ -153,6 +170,7 @@ class ClanResponse(BaseModel):
     description: Optional[str]
     members_count: int
     trophies: int
+    is_member: bool = False
     
     class Config:
         orm_mode = True
@@ -168,21 +186,23 @@ class LeaderboardEntry(BaseModel):
 # ==================== 🔧 Helper функции (UTC) ====================
 
 def ensure_utc(dt: datetime) -> datetime:
-    """
-    Гарантирует, что datetime имеет timezone UTC.
-    - Если нет timezone → считаем что это UTC и добавляем
-    - Если есть timezone → конвертируем в UTC
-    """
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
 
 
 def model_to_dict(model):
-    """Совместимость с Pydantic v1 и v2"""
     if hasattr(model, 'model_dump'):
         return model.model_dump()
     return model.dict()
+
+
+# Карта флагов
+FLAG_MAP = {
+    'RU': '🇷🇺', 'US': '🇺🇸', 'DE': '🇩🇪', 'FR': '🇫🇷',
+    'GB': '🇬🇧', 'CN': '🇨🇳', 'BR': '🇧🇷', 'UA': '🇺🇦',
+    'KZ': '🇰🇿', 'BY': '🇧🇾'
+}
 
 
 # ==================== 🔐 Auth эндпоинты ====================
@@ -246,6 +266,29 @@ def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+@app.patch("/api/users/me", response_model=UserResponse)
+def update_profile(
+    profile_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    update_data = {}
+    
+    if profile_data.clash_tag is not None:
+        update_data['clash_tag'] = profile_data.clash_tag
+    
+    if profile_data.country_code is not None:
+        update_data['country_code'] = profile_data.country_code
+    
+    if update_data:
+        for key, value in update_data.items():
+            setattr(current_user, key, value)
+        db.commit()
+        db.refresh(current_user)
+    
+    return current_user
+
+
 # ==================== 🏆 Tournament эндпоинты ====================
 
 @app.get("/api/tournaments", response_model=List[TournamentResponse])
@@ -255,16 +298,14 @@ def get_tournaments(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    now_utc = datetime.now(timezone.utc)  # ✅ Текущее время в UTC
+    now_utc = datetime.now(timezone.utc)
     tournaments = db.query(Tournament).all()
     
     result = []
     for t in tournaments:
-        # 🔧 Конвертируем дату турнира в UTC для сравнения
         tournament_date_utc = ensure_utc(t.date)
         time_until_start = tournament_date_utc - now_utc
         
-        # Определяем статус на основе UTC
         if tournament_date_utc + timedelta(hours=2) <= now_utc:
             status = "past"
         elif time_until_start <= timedelta(hours=24):
@@ -284,7 +325,7 @@ def get_tournaments(
         result.append({
             "id": t.id,
             "name": t.name,
-            "date": t.date,  # Отправляем как есть (UTC)
+            "date": t.date,
             "prize": t.prize,
             "mode": t.mode,
             "max_players": t.max_players,
@@ -353,17 +394,15 @@ def create_tournament(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # 🔧 Конвертируем входящую дату в UTC
     tournament_date_utc = ensure_utc(tournament.date)
     now_utc = datetime.now(timezone.utc)
     
-    # Проверяем что дата не в прошлом (в UTC)
     if tournament_date_utc <= now_utc:
         raise HTTPException(status_code=400, detail="Нельзя создать турнир с датой в прошлом")
     
     new_tournament = Tournament(
         name=tournament.name,
-        date=tournament_date_utc,  # ✅ Сохраняем в UTC
+        date=tournament_date_utc,
         prize=tournament.prize,
         mode=tournament.mode,
         max_players=tournament.max_players,
@@ -391,7 +430,6 @@ def join_tournament(
     now_utc = datetime.now(timezone.utc)
     tournament_date_utc = ensure_utc(tournament.date)
     
-    # Проверяем что турнир ещё не начался (в UTC)
     if tournament_date_utc <= now_utc:
         raise HTTPException(status_code=400, detail="Нельзя вступить в начавшийся турнир")
     
@@ -458,11 +496,14 @@ def get_tournament_participants(
     for p in participants:
         user = db.query(User).filter(User.id == p.user_id).first()
         if user:
+            flag = FLAG_MAP.get(user.country_code, '🌍') if user.country_code else '🌍'
             result.append({
                 "id": p.id,
                 "user_id": p.user_id,
                 "username": user.username,
                 "clash_tag": user.clash_tag,
+                "country_code": user.country_code,
+                "country_flag": flag,
                 "joined_at": p.joined_at
             })
     
@@ -472,21 +513,54 @@ def get_tournament_participants(
 # ==================== 👥 Clan эндпоинты ====================
 
 @app.get("/api/clans", response_model=List[ClanResponse])
-def get_clans(search: Optional[str] = None, tag: Optional[str] = None, db: Session = Depends(get_db)):
+def get_clans(
+    search: Optional[str] = None, 
+    tag: Optional[str] = None, 
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     query = db.query(Clan)
     if search:
         query = query.filter(Clan.name.ilike(f"%{search}%"))
     if tag:
         query = query.filter(Clan.tag == tag.upper())
-    return query.all()
+    
+    clans = query.all()
+    
+    # 🔧 Проверяем состоит ли пользователь в каждом клане
+    result = []
+    for clan in clans:
+        is_member = db.query(ClanMember).filter(
+            ClanMember.user_id == current_user.id,
+            ClanMember.clan_id == clan.id
+        ).first() is not None
+        
+        clan_dict = model_to_dict(clan)
+        clan_dict['is_member'] = is_member
+        result.append(clan_dict)
+    
+    return result
 
 
 @app.get("/api/clans/{clan_id}", response_model=ClanResponse)
-def get_clan(clan_id: int, db: Session = Depends(get_db)):
+def get_clan(
+    clan_id: int, 
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     clan = db.query(Clan).filter(Clan.id == clan_id).first()
     if not clan:
         raise HTTPException(status_code=404, detail="Клан не найден")
-    return clan
+    
+    is_member = db.query(ClanMember).filter(
+        ClanMember.user_id == current_user.id,
+        ClanMember.clan_id == clan_id
+    ).first() is not None
+    
+    clan_dict = model_to_dict(clan)
+    clan_dict['is_member'] = is_member
+    
+    return clan_dict
 
 
 @app.post("/api/clans", response_model=ClanResponse, status_code=status.HTTP_201_CREATED)
@@ -495,6 +569,18 @@ def create_clan(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # 🔧 Проверяем состоит ли пользователь уже в клане
+    existing_membership = db.query(ClanMember).filter(
+        ClanMember.user_id == current_user.id
+    ).first()
+    
+    if existing_membership:
+        current_clan = db.query(Clan).filter(Clan.id == existing_membership.clan_id).first()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Вы уже состоите в клане '{current_clan.name}' ({current_clan.tag}). Сначала покиньте его."
+        )
+    
     if db.query(Clan).filter(Clan.tag == clan.tag.upper()).first():
         raise HTTPException(status_code=400, detail="Клан с таким тегом уже существует")
     
@@ -507,7 +593,10 @@ def create_clan(
     db.add(member)
     db.commit()
     
-    return new_clan
+    clan_dict = model_to_dict(new_clan)
+    clan_dict['is_member'] = True
+    
+    return clan_dict
 
 
 @app.post("/api/clans/{clan_id}/join", status_code=status.HTTP_200_OK)
@@ -520,12 +609,17 @@ def join_clan(
     if not clan:
         raise HTTPException(status_code=404, detail="Клан не найден")
     
-    existing = db.query(ClanMember).filter(
-        ClanMember.user_id == current_user.id,
-        ClanMember.clan_id == clan_id
+    # 🔧 ПРОВЕРКА: состоит ли пользователь уже в каком-то клане
+    existing_membership = db.query(ClanMember).filter(
+        ClanMember.user_id == current_user.id
     ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Вы уже в этом клане")
+    
+    if existing_membership:
+        current_clan = db.query(Clan).filter(Clan.id == existing_membership.clan_id).first()
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Вы уже состоите в клане '{current_clan.name}' ({current_clan.tag}). Сначала покиньте его."
+        )
     
     member = ClanMember(user_id=current_user.id, clan_id=clan_id)
     db.add(member)
@@ -533,6 +627,28 @@ def join_clan(
     db.commit()
     
     return {"message": "Вы успешно присоединились к клану"}
+
+
+@app.post("/api/clans/leave", status_code=status.HTTP_200_OK)
+def leave_clan(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    member = db.query(ClanMember).filter(
+        ClanMember.user_id == current_user.id
+    ).first()
+    
+    if not member:
+        raise HTTPException(status_code=400, detail="Вы не состоите в клане")
+    
+    clan = db.query(Clan).filter(Clan.id == member.clan_id).first()
+    if clan:
+        clan.members_count = max(0, clan.members_count - 1)
+    
+    db.delete(member)
+    db.commit()
+    
+    return {"message": "Вы успешно покинули клан"}
 
 
 # ==================== 📊 Leaderboard эндпоинт ====================

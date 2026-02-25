@@ -13,6 +13,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="client")
     clash_tag = Column(String, nullable=True)
+    country_code = Column(String(2), nullable=True)  #  RU, US, DE и т.д.
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     tournaments_created = relationship("Tournament", back_populates="creator")
