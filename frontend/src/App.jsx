@@ -11,6 +11,7 @@ import TournamentDetails from './pages/TournamentDetails'
 import Leaderboard from './pages/Leaderboard'
 import Clans from './pages/Clans'
 import Help from './pages/Help'
+import Profile from './pages/Profile'  // 🔧 Добавлен импорт Profile
 
 // 🔐 Защищённый роут
 function ProtectedRoute({ children }) {
@@ -42,6 +43,16 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/rules" element={<Rules />} />
         <Route path="/help" element={<Help />} />
+
+        {/* 🔧 Новый роут: Профиль */}
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Защищённые роуты */}
         <Route

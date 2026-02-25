@@ -57,9 +57,13 @@ function Navigation() {
         {/* Правая часть: Авторизация или Профиль пользователя */}
         <div className="flex items-center gap-4">
           {user ? (
-            // ✅ Авторизован: показываем инфо о пользователе
+            // ✅ Авторизован: показываем инфо о пользователе (кликабельный профиль)
             <>
-              <div className="flex items-center gap-3 px-5 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/50 rounded-md">
+              {/* 🔧 Профиль — кликабельный с hover-эффектом */}
+              <Link 
+                to="/profile"
+                className="flex items-center gap-3 px-5 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/50 rounded-md transition-all duration-300 hover:scale-110 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/30 cursor-pointer"
+              >
                 {/* Аватарка с первой буквой */}
                 <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg shadow-blue-600/30">
                   <span className="text-white font-bold text-sm">
@@ -75,7 +79,7 @@ function Navigation() {
                     {user.email}
                   </p>
                 </div>
-              </div>
+              </Link>
               
               {/* Кнопка выхода */}
               <button
