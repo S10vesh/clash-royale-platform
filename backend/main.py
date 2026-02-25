@@ -192,10 +192,8 @@ def ensure_utc(dt: datetime) -> datetime:
 
 
 def model_to_dict(model):
-    if hasattr(model, 'model_dump'):
-        return model.model_dump()
-    return model.dict()
-
+    """Конвертирует SQLAlchemy модель в словарь"""
+    return {c.name: getattr(model, c.name) for c in model.__table__.columns}
 
 # Карта флагов
 FLAG_MAP = {
